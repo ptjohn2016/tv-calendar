@@ -504,6 +504,12 @@ const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
   ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
 
+/* Google hands back @googlemail.com for older UK/German accounts — it's the
+   same mailbox as @gmail.com. Treat the two as one address so the allowlist
+   doesn't reject you over a legacy domain alias. */
+const normEmail = e => String(e ?? "").trim().toLowerCase()
+  .replace(/@googlemail\.com$/, "@gmail.com");
+
 /** Stable pair of hues from a show id, so each show keeps its colour. */
 function hues(id){
   let h = 0;
@@ -1207,8 +1213,8 @@ async function startFirebase(){
 
   auth.onAuthStateChanged(A, async user => {
     if (!user){ $("#gate").classList.add("on"); $("#shell").classList.remove("on"); return; }
-    const email = (user.email || "").toLowerCase();
-    if (CONFIG.allowlist.length && !CONFIG.allowlist.map(x => x.toLowerCase()).includes(email)){
+    const email = normEmail(user.email);
+    if (CONFIG.allowlist.length && !CONFIG.allowlist.map(normEmail).includes(email)){
       await auth.signOut(A);
       gateError(`${email} isn't on the guest list for this calendar.`);
       return;
