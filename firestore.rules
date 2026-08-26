@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// Security rules for the shared TV calendar.
+//
+// The Firebase config inside index.html is public by design — that is normal
+// and safe. THESE RULES are what actually protect the data, so the allowlist
+// must be maintained here as well as in the CONFIG block in index.html.
+//
+// Deploy from the Firebase console: Firestore Database → Rules → paste → Publish.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Google accounts allowed to read and edit the shared watchlist.
+    // Keep this in sync with CONFIG.allowlist in index.html, and re-publish
+    // these rules in the Firebase console whenever you change it.
+    function allowed() {
+      return request.auth != null
+          && request.auth.token.email_verified == true
+          && request.auth.token.email.lower() in [
+               'johncap.pt@gmail.com'
+               // , 'them@gmail.com'   <- add the second person here
+             ];
+    }
+
+    match /watchlist/{showId} {
+      allow read, write: if allowed();
+    }
+
+    // Everything else stays shut.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0b0618">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Screen Time">
+<title>Screen Time — TV Calendar</title>
+<link rel="preconnect" href="https://api.tvmaze.com">
+<link rel="preconnect" href="https://static.tvmaze.com">
+<style>
+/* ══════════════════════════  TOKENS  ══════════════════════════ */
+:root{
+  --bg:#0b0618;
+  --ink:#f4efff;
+  --ink-dim:#a99cc9;
+  --ink-faint:#6f6494;
+  --glass:rgba(255,255,255,.055);
+  --glass-2:rgba(255,255,255,.10);
+  --stroke:rgba(255,255,255,.11);
+  --stroke-hi:rgba(255,255,255,.24);
+  --hot:#ff2d7a;
+  --grape:#8b5cf6;
+  --cyan:#22d3ee;
+  --lime:#a3e635;
+  --gold:#fbbf24;
+  --r-lg:22px; --r-md:16px; --r-sm:11px;
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-l:env(safe-area-inset-left,0px);
+  --safe-r:env(safe-area-inset-right,0px);
+  --rail-w:332px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Inter,system-ui,sans-serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  margin:0;font-family:var(--font);background:var(--bg);color:var(--ink);
+  -webkit-font-smoothing:antialiased;overscroll-behavior-y:none;
+}
+body::before{
+  content:"";position:fixed;inset:-30%;z-index:-2;pointer-events:none;
+  background:
+    radial-gradient(48vw 42vw at 12% 8%,  rgba(255,45,122,.30), transparent 62%),
+    radial-gradient(52vw 46vw at 88% 4%,  rgba(139,92,246,.34), transparent 60%),
+    radial-gradient(60vw 50vw at 70% 92%, rgba(34,211,238,.22), transparent 64%),
+    radial-gradient(46vw 40vw at 8%  88%, rgba(251,191,36,.15), transparent 62%);
+  filter:blur(30px);animation:drift 34s ease-in-out infinite alternate;
+}
+body::after{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.55;
+  background:linear-gradient(180deg,rgba(11,6,24,.25),rgba(11,6,24,.88));
+}
+@keyframes drift{
+  0%{transform:translate3d(0,0,0) scale(1)}
+  50%{transform:translate3d(2%,-2%,0) scale(1.06)}
+  100%{transform:translate3d(-2%,2%,0) scale(1.03)}
+}
+@media (prefers-reduced-motion:reduce){
+  body::before{animation:none}
+  *{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+button,input{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+img{display:block}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:8px}
+::selection{background:var(--hot);color:#fff}
+.hidden{display:none!important}
+
+/* ══════════════════════════  GATE  ══════════════════════════ */
+.gate{
+  position:fixed;inset:0;z-index:90;display:none;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;
+  padding:calc(var(--safe-t) + 30px) 28px calc(var(--safe-b) + 30px);
+}
+.gate.on{display:flex}
+.gate .logo{font-size:56px;margin-bottom:20px;filter:drop-shadow(0 8px 26px rgba(255,45,122,.5))}
+.gate h1{
+  margin:0 0 10px;font-size:32px;font-weight:850;letter-spacing:-.045em;line-height:1.05;
+  background:linear-gradient(96deg,var(--hot),var(--grape) 46%,var(--cyan));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.gate p{margin:0 0 28px;font-size:14.5px;color:var(--ink-dim);line-height:1.6;max-width:330px}
+.gate .err{color:var(--hot);font-weight:650}
+.gbtn{
+  display:flex;align-items:center;gap:11px;padding:0 22px;height:52px;border-radius:16px;
+  background:#fff;color:#1a1526;font-weight:750;font-size:15px;letter-spacing:-.01em;
+  box-shadow:0 14px 40px -12px rgba(0,0,0,.7);transition:transform .15s;
+}
+.gbtn:active{transform:scale(.96)}
+.gbtn svg{width:19px;height:19px}
+.ghost{
+  margin-top:16px;font-size:13px;font-weight:650;color:var(--ink-faint);
+  padding:10px 16px;border-radius:11px;border:1px solid var(--stroke);
+}
+.ghost:active{background:var(--glass)}
+.setupcard{
+  margin-top:26px;text-align:left;background:var(--glass);border:1px solid var(--stroke);
+  border-radius:var(--r-md);padding:16px 18px;max-width:420px;font-size:12.5px;
+  color:var(--ink-dim);line-height:1.65;
+}
+.setupcard b{color:var(--ink);font-weight:750}
+.setupcard code{
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;
+  background:rgba(0,0,0,.35);padding:1px 5px;border-radius:5px;color:var(--cyan);
+}
+
+/* ══════════════════════════  SHELL  ══════════════════════════ */
+#shell{display:none;min-height:100%;flex-direction:column}
+#shell.on{display:flex}
+
+.topbar{
+  position:sticky;top:0;z-index:40;
+  padding:calc(var(--safe-t) + 10px) calc(var(--safe-r) + 14px) 11px calc(var(--safe-l) + 14px);
+  background:linear-gradient(180deg,rgba(11,6,24,.95),rgba(11,6,24,.75) 68%,transparent);
+  backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);
+}
+.brandrow{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+.brand{font-size:19px;font-weight:850;letter-spacing:-.035em;display:flex;align-items:center;gap:8px;margin-right:auto}
+.brand span{
+  background:linear-gradient(96deg,var(--hot),var(--grape) 46%,var(--cyan));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.dot-live{width:8px;height:8px;border-radius:50%;background:var(--lime);box-shadow:0 0 12px var(--lime);animation:pulse 2.4s infinite;flex:0 0 8px}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.75)}}
+.chip-local{
+  font-size:9.5px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;
+  padding:3px 7px;border-radius:6px;background:rgba(251,191,36,.18);color:var(--gold);
+}
+.iconbtn{
+  width:44px;height:44px;flex:0 0 44px;border-radius:14px;display:grid;place-items:center;
+  background:var(--glass);border:1px solid var(--stroke);transition:transform .15s,background .2s;position:relative;
+}
+.iconbtn:active{transform:scale(.9);background:var(--glass-2)}
+.iconbtn svg{width:19px;height:19px;stroke:var(--ink);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.iconbtn .badge{
+  position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;
+  background:var(--hot);color:#fff;font-size:11px;font-weight:850;display:grid;place-items:center;
+  border:2px solid var(--bg);line-height:1;
+}
+.avatar{width:44px;height:44px;flex:0 0 44px;border-radius:14px;object-fit:cover;border:1px solid var(--stroke-hi)}
+
+.weeknav{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.weeknav .range{flex:1;min-width:0}
+.weeknav .range h2{margin:0;font-size:16px;font-weight:800;letter-spacing:-.025em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.weeknav .range p{margin:1.5px 0 0;font-size:11.5px;color:var(--ink-faint);font-weight:650}
+.nowbtn{
+  height:44px;padding:0 15px;border-radius:14px;font-size:13.5px;font-weight:800;letter-spacing:-.015em;
+  background:linear-gradient(96deg,var(--hot),var(--grape));color:#fff;
+  box-shadow:0 6px 20px -7px rgba(255,45,122,.85);transition:transform .15s;
+  display:flex;align-items:center;gap:6px;white-space:nowrap;
+}
+.nowbtn:active{transform:scale(.94)}
+
+.strip{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.day{
+  position:relative;border-radius:var(--r-sm);padding:7px 2px 7px;text-align:center;min-height:57px;
+  background:var(--glass);border:1px solid transparent;transition:background .18s,transform .12s,border-color .18s;
+}
+.day:active{transform:scale(.93)}
+.day .dow{font-size:9.5px;font-weight:850;letter-spacing:.08em;color:var(--ink-faint);text-transform:uppercase}
+.day .num{font-size:16.5px;font-weight:800;margin-top:2px;letter-spacing:-.03em;line-height:1.15}
+.day .pips{display:flex;gap:2.5px;justify-content:center;height:5px;margin-top:4px}
+.day .pips i{width:4.5px;height:4.5px;border-radius:50%;display:block}
+.day.today{background:var(--glass-2);border-color:var(--stroke-hi)}
+.day.today .num,.day.today .dow{color:var(--lime)}
+.day.sel{background:linear-gradient(160deg,rgba(255,45,122,.32),rgba(139,92,246,.32));border-color:rgba(255,255,255,.36)}
+.day.empty .num{opacity:.32}
+
+/* ══════════════════════════  BOARD  ══════════════════════════ */
+.body{display:flex;flex:1;min-height:0;gap:20px;padding:0 calc(var(--safe-r) + 14px) 0 calc(var(--safe-l) + 14px)}
+.board{flex:1;min-width:0;padding-bottom:calc(var(--safe-b) + 110px);touch-action:pan-y}
+.board.swap{animation:swap .34s cubic-bezier(.2,.8,.3,1)}
+@keyframes swap{from{opacity:0;transform:translateX(var(--dx,18px))}to{opacity:1;transform:none}}
+
+.dayblock{margin-top:22px;scroll-margin-top:200px}
+.dayhead{display:flex;align-items:baseline;gap:9px;margin-bottom:11px;padding-left:2px}
+.dayhead h3{margin:0;font-size:14px;font-weight:850;letter-spacing:-.02em}
+.dayhead .meta{font-size:11.5px;color:var(--ink-faint);font-weight:700;margin-left:auto}
+.dayhead .tag{font-size:9.5px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:6px;background:var(--lime);color:#0b0618}
+
+.ep{
+  display:flex;gap:12px;align-items:center;padding:10px;margin-bottom:9px;
+  border-radius:var(--r-md);position:relative;overflow:hidden;width:100%;text-align:left;
+  background:var(--glass);border:1px solid var(--stroke);transition:transform .14s,border-color .2s;
+}
+.ep:active{transform:scale(.985);border-color:var(--stroke-hi)}
+.ep::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3.5px;background:linear-gradient(180deg,hsl(var(--h) 92% 68%),hsl(var(--h2) 92% 60%))}
+.ep::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.14;background:radial-gradient(120% 100% at 0% 50%,hsl(var(--h) 92% 60%),transparent 58%)}
+.ep .poster{width:46px;height:66px;flex:0 0 46px;border-radius:9px;object-fit:cover;background:linear-gradient(150deg,hsl(var(--h) 55% 26%),hsl(var(--h2) 55% 17%));border:1px solid var(--stroke)}
+.ep .txt{flex:1;min-width:0;position:relative}
+.ep .show{font-size:14.5px;font-weight:800;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ep .code{display:inline-block;font-size:10.5px;font-weight:850;letter-spacing:.05em;color:hsl(var(--h) 92% 76%);margin-top:3px}
+.ep .title{font-size:12.5px;color:var(--ink-dim);margin-top:2px;font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ep .right{text-align:right;flex:0 0 auto;position:relative}
+.ep .time{font-size:12.5px;font-weight:800;color:var(--ink-dim);white-space:nowrap}
+.ep .state{font-size:9.5px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;margin-top:5px;padding:3px 7px;border-radius:6px;display:inline-block;white-space:nowrap}
+.state.out{background:rgba(163,230,53,.18);color:var(--lime)}
+.state.soon{background:rgba(251,191,36,.18);color:var(--gold)}
+.state.prem{background:linear-gradient(96deg,var(--hot),var(--grape));color:#fff}
+.state.fin{background:rgba(34,211,238,.18);color:var(--cyan)}
+
+.empty-week{margin-top:54px;text-align:center;padding:0 24px}
+.empty-week .em{font-size:44px;margin-bottom:12px}
+.empty-week h3{margin:0 0 6px;font-size:17px;font-weight:800;letter-spacing:-.025em}
+.empty-week p{margin:0 auto;font-size:13.5px;color:var(--ink-faint);line-height:1.55;max-width:290px}
+
+/* ══════════════════════════  RAIL  ══════════════════════════ */
+.rail{
+  width:var(--rail-w);flex:0 0 var(--rail-w);position:sticky;top:0;align-self:flex-start;
+  max-height:100vh;overflow-y:auto;padding:22px 2px calc(var(--safe-b) + 40px);
+}
+.rail h4{margin:0 0 12px;font-size:10.5px;font-weight:850;letter-spacing:.13em;text-transform:uppercase;color:var(--ink-faint);display:flex;align-items:center;gap:8px}
+.rail h4::after{content:"";flex:1;height:1px;background:var(--stroke)}
+.rail .none{font-size:12.5px;color:var(--ink-faint);line-height:1.6;padding:2px 2px 14px}
+
+.cd{
+  display:flex;gap:11px;align-items:center;padding:11px;margin-bottom:9px;width:100%;text-align:left;
+  border-radius:var(--r-md);background:var(--glass);border:1px solid var(--stroke);
+  position:relative;overflow:hidden;transition:transform .14s;
+}
+.cd:active{transform:scale(.985)}
+.cd::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.17;background:radial-gradient(110% 130% at 100% 0%,hsl(var(--h) 92% 60%),transparent 60%)}
+.cd .poster{width:40px;height:58px;flex:0 0 40px;border-radius:8px;object-fit:cover;background:linear-gradient(150deg,hsl(var(--h) 55% 26%),hsl(var(--h2) 55% 17%));border:1px solid var(--stroke)}
+.cd .txt{flex:1;min-width:0;position:relative}
+.cd .show{font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.02em}
+.cd .sub{font-size:11px;color:var(--ink-faint);margin-top:2.5px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cd .big{position:relative;text-align:right;flex:0 0 auto;line-height:1}
+.cd .big .n{
+  font-size:24px;font-weight:850;letter-spacing:-.045em;display:block;
+  background:linear-gradient(150deg,hsl(var(--h) 96% 78%),hsl(var(--h2) 96% 62%));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.cd .big .u{font-size:9.5px;font-weight:850;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin-top:5px;display:block}
+.cd.tba .big .n{font-size:12.5px;letter-spacing:0;background:none;-webkit-text-fill-color:var(--ink-faint);color:var(--ink-faint)}
+.cd.now{border-color:rgba(163,230,53,.45);background:rgba(163,230,53,.10)}
+.cd.now .big .n{font-size:15px;letter-spacing:-.02em;background:none;-webkit-text-fill-color:var(--lime);color:var(--lime)}
+.cd .flare{position:absolute;top:7px;right:7px;font-size:13px;animation:bob 1.9s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(-8deg)}50%{transform:translateY(-3px) rotate(8deg)}}
+
+.railback{position:fixed;inset:0;z-index:44;background:rgba(6,3,14,.6);backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity .25s}
+.railback.on{opacity:1;pointer-events:auto}
+
+/* ══════════════════════════  FAB  ══════════════════════════ */
+.fab{
+  position:fixed;right:calc(var(--safe-r) + 16px);bottom:calc(var(--safe-b) + 18px);z-index:45;
+  height:54px;padding:0 21px;border-radius:18px;display:flex;align-items:center;gap:9px;
+  font-size:15px;font-weight:800;letter-spacing:-.02em;color:#fff;
+  background:linear-gradient(96deg,var(--hot),var(--grape));
+  box-shadow:0 14px 36px -10px rgba(255,45,122,.85),0 0 0 1px rgba(255,255,255,.14) inset;
+  transition:transform .16s;
+}
+.fab:active{transform:scale(.93)}
+.fab svg{width:19px;height:19px;stroke:#fff;fill:none;stroke-width:2.6;stroke-linecap:round}
+
+/* ══════════════════════════  SHEET  ══════════════════════════ */
+.scrim{position:fixed;inset:0;z-index:60;background:rgba(6,3,14,.72);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);opacity:0;pointer-events:none;transition:opacity .26s}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:61;max-height:88vh;display:flex;flex-direction:column;
+  background:linear-gradient(180deg,#1c1035,#120a26);
+  border-top:1px solid var(--stroke-hi);border-radius:26px 26px 0 0;
+  transform:translateY(101%);transition:transform .34s cubic-bezier(.2,.85,.3,1);
+  padding-bottom:var(--safe-b);
+  box-shadow:0 -20px 60px -12px rgba(0,0,0,.8);
+}
+.sheet.on{transform:none}
+.grab{width:38px;height:4.5px;border-radius:3px;background:rgba(255,255,255,.24);margin:10px auto 4px;flex:0 0 auto}
+.sheet header{display:flex;align-items:center;gap:10px;padding:8px 18px 12px;flex:0 0 auto}
+.sheet header h3{margin:0;font-size:19px;font-weight:850;letter-spacing:-.035em;flex:1}
+.sheet .scroll{overflow-y:auto;padding:0 14px 20px;-webkit-overflow-scrolling:touch}
+
+.searchbox{display:flex;align-items:center;gap:10px;margin:0 18px 14px;padding:0 14px;height:48px;border-radius:15px;background:rgba(0,0,0,.32);border:1px solid var(--stroke);flex:0 0 auto}
+.searchbox:focus-within{border-color:var(--grape);box-shadow:0 0 0 3px rgba(139,92,246,.2)}
+.searchbox svg{width:17px;height:17px;stroke:var(--ink-faint);fill:none;stroke-width:2.2;flex:0 0 17px}
+.searchbox input{flex:1;min-width:0;background:none;border:0;outline:none;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.searchbox input::placeholder{color:var(--ink-faint)}
+
+.res{display:flex;gap:12px;align-items:center;padding:9px;border-radius:var(--r-md);margin-bottom:6px;width:100%;text-align:left;transition:background .18s}
+.res:active{background:var(--glass)}
+.res .poster{width:44px;height:63px;flex:0 0 44px;border-radius:8px;object-fit:cover;background:linear-gradient(150deg,hsl(var(--h) 55% 26%),hsl(var(--h2) 55% 17%));border:1px solid var(--stroke)}
+.res .txt{flex:1;min-width:0}
+.res .n{font-size:14.5px;font-weight:800;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.res .m{font-size:11.5px;color:var(--ink-faint);margin-top:3px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{flex:0 0 auto;height:33px;padding:0 14px;border-radius:11px;font-size:12.5px;font-weight:800;letter-spacing:-.01em;background:linear-gradient(96deg,var(--hot),var(--grape));color:#fff;transition:transform .15s}
+.pill:active{transform:scale(.92)}
+.pill.have{background:var(--glass);color:var(--ink-faint);border:1px solid var(--stroke)}
+.pill.kill{background:rgba(255,45,122,.14);color:var(--hot);border:1px solid rgba(255,45,122,.32)}
+.hint{font-size:12.5px;color:var(--ink-faint);text-align:center;padding:34px 20px;line-height:1.6}
+
+.me{display:flex;align-items:center;gap:12px;padding:12px;margin:0 0 14px;border-radius:var(--r-md);background:var(--glass);border:1px solid var(--stroke)}
+.me img{width:42px;height:42px;border-radius:12px;object-fit:cover}
+.me .txt{flex:1;min-width:0}
+.me .n{font-size:14px;font-weight:800;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.me .m{font-size:11.5px;color:var(--ink-faint);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ══════════════════════════  CELEBRATION  ══════════════════════════ */
+#confetti{position:fixed;inset:0;z-index:79;pointer-events:none;display:none}
+#confetti.on{display:block}
+.party{
+  position:fixed;inset:0;z-index:80;display:none;align-items:center;justify-content:center;
+  padding:calc(var(--safe-t) + 24px) 26px calc(var(--safe-b) + 24px);
+  background:radial-gradient(70% 60% at 50% 40%,rgba(139,92,246,.35),rgba(6,3,14,.9) 70%);
+  backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);
+}
+.party.on{display:flex;animation:fadein .3s}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.party .card{
+  text-align:center;max-width:360px;width:100%;animation:pop .5s cubic-bezier(.2,1.5,.4,1);
+}
+@keyframes pop{from{opacity:0;transform:scale(.82) translateY(24px)}to{opacity:1;transform:none}}
+.party .poster{
+  width:120px;height:172px;border-radius:16px;object-fit:cover;margin:0 auto 20px;
+  border:1px solid var(--stroke-hi);
+  box-shadow:0 20px 60px -14px rgba(255,45,122,.75);
+  background:linear-gradient(150deg,hsl(var(--h) 55% 26%),hsl(var(--h2) 55% 17%));
+}
+.party .kicker{font-size:10.5px;font-weight:850;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:10px}
+.party h2{
+  margin:0 0 8px;font-size:34px;font-weight:850;letter-spacing:-.05em;line-height:1;
+  background:linear-gradient(96deg,var(--hot),var(--grape) 45%,var(--cyan));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.party .name{font-size:17px;font-weight:800;letter-spacing:-.03em;margin-bottom:12px}
+.party .when{font-size:13.5px;color:var(--ink-dim);font-weight:650;line-height:1.5}
+.party .go{
+  margin-top:26px;height:52px;padding:0 34px;border-radius:16px;font-size:15.5px;font-weight:850;letter-spacing:-.02em;
+  color:#fff;background:linear-gradient(96deg,var(--hot),var(--grape));
+  box-shadow:0 14px 40px -12px rgba(255,45,122,.9);transition:transform .15s;
+}
+.party .go:active{transform:scale(.94)}
+
+/* ══════════════════════════  TOAST  ══════════════════════════ */
+#toast{
+  position:fixed;left:50%;bottom:calc(var(--safe-b) + 90px);z-index:85;
+  transform:translate(-50%,20px);opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;
+  background:rgba(28,16,53,.96);border:1px solid var(--stroke-hi);border-radius:14px;
+  padding:11px 18px;font-size:13.5px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;
+  box-shadow:0 14px 40px -12px rgba(0,0,0,.8);max-width:90vw;overflow:hidden;text-overflow:ellipsis;
+}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ══════════════════════════  RESPONSIVE  ══════════════════════════ */
+@media (max-width:900px){
+  .rail{
+    position:fixed;top:0;right:0;bottom:0;z-index:46;width:min(86vw,340px);flex:0 0 auto;
+    max-height:none;transform:translateX(101%);transition:transform .32s cubic-bezier(.2,.85,.3,1);
+    background:linear-gradient(200deg,#1c1035,#100920);
+    border-left:1px solid var(--stroke-hi);
+    padding:calc(var(--safe-t) + 20px) 15px calc(var(--safe-b) + 30px);
+    box-shadow:-20px 0 60px -14px rgba(0,0,0,.8);
+  }
+  .rail.on{transform:none}
+}
+@media (min-width:901px){
+  .railtoggle{display:none}
+  .railback{display:none}
+  .topbar,.body{max-width:1180px;margin-inline:auto;width:100%}
+  .brand{font-size:21px}
+}
+@media (min-width:901px){
+  .sheet{left:50%;transform:translate(-50%,101%);width:min(520px,94vw);border-radius:26px;bottom:20px;max-height:80vh}
+  .sheet.on{transform:translate(-50%,0)}
+}
+</style>
+</head>
+<body>
+
+<!-- ─────────  SIGN-IN GATE  ───────── -->
+<div class="gate on" id="gate">
+  <div class="logo">📺</div>
+  <h1 id="gateTitle">Screen Time</h1>
+  <p id="gateMsg">Your shows, your week, counted down to the minute.</p>
+  <button class="gbtn" id="gsignin">
+    <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.6 12.2c0-.8-.1-1.4-.2-2H12v3.9h6c-.1 1-.8 2.5-2.2 3.5l3.4 2.6c2-1.8 3.4-4.6 3.4-8z"/><path fill="#34A853" d="M12 23c2.9 0 5.4-1 7.2-2.6l-3.4-2.6c-.9.6-2.1 1-3.8 1-2.9 0-5.4-1.9-6.3-4.6l-3.6 2.7C3.9 20.5 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.7 14.2c-.2-.7-.4-1.4-.4-2.2s.1-1.5.4-2.2L2.1 7.1C1.4 8.6 1 10.2 1 12s.4 3.4 1.1 4.9l3.6-2.7z"/><path fill="#EA4335" d="M12 4.8c1.6 0 2.7.7 3.4 1.3l2.9-2.9C16.5 1.6 14.1.6 12 .6 7.7.6 3.9 3.1 2.1 7.1l3.6 2.7C6.6 6.7 9.1 4.8 12 4.8z"/></svg>
+    Continue with Google
+  </button>
+  <button class="ghost hidden" id="glocal">Try it without signing in →</button>
+  <div class="setupcard hidden" id="gsetup"></div>
+</div>
+
+<!-- ─────────  APP  ───────── -->
+<div id="shell">
+  <div class="topbar">
+    <div class="brandrow">
+      <div class="brand"><i class="dot-live"></i><span>Screen&nbsp;Time</span></div>
+      <span class="chip-local hidden" id="localChip">Local</span>
+      <button class="iconbtn railtoggle" id="railBtn" aria-label="Countdowns">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 1.9"/></svg>
+        <span class="badge hidden" id="railBadge">0</span>
+      </button>
+      <button class="iconbtn" id="showsBtn" aria-label="My shows">
+        <svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="13.5" rx="2.5"/><path d="M8 2.6 12 6l4-3.4"/></svg>
+      </button>
+      <button class="iconbtn hidden" id="meBtn" aria-label="Account" style="padding:0;overflow:hidden">
+        <img class="avatar hidden" id="meAvatar" alt="">
+      </button>
+    </div>
+
+    <div class="weeknav">
+      <button class="iconbtn" id="prevW" aria-label="Previous week">
+        <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div class="range"><h2 id="wRange">—</h2><p id="wSub">—</p></div>
+      <button class="nowbtn hidden" id="nowBtn">
+        <svg viewBox="0 0 24 24" style="width:15px;height:15px;stroke:#fff;fill:none;stroke-width:2.4;stroke-linecap:round"><path d="M12 4v8l5 3"/><circle cx="12" cy="12" r="9"/></svg>
+        This week
+      </button>
+      <button class="iconbtn" id="nextW" aria-label="Next week">
+        <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+
+    <div class="strip" id="strip"></div>
+  </div>
+
+  <div class="body">
+    <main class="board" id="board"></main>
+    <aside class="rail" id="rail">
+      <h4>Up next</h4>
+      <div id="railList"></div>
+    </aside>
+  </div>
+
+  <div class="railback" id="railBack"></div>
+
+  <button class="fab" id="fab">
+    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    Add show
+  </button>
+</div>
+
+<!-- ─────────  SHEETS  ───────── -->
+<div class="scrim" id="scrim"></div>
+
+<div class="sheet" id="searchSheet">
+  <div class="grab"></div>
+  <header><h3>Add a show</h3><button class="iconbtn" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+  <div class="searchbox">
+    <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+    <input id="q" type="search" placeholder="Search TVmaze…" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search">
+  </div>
+  <div class="scroll" id="results"><div class="hint">Type a show name to search.<br>Powered by TVmaze — no API key needed.</div></div>
+</div>
+
+<div class="sheet" id="showsSheet">
+  <div class="grab"></div>
+  <header><h3>My shows</h3><button class="iconbtn" data-close><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+  <div class="scroll" id="myShows"></div>
+</div>
+
+<!-- ─────────  CELEBRATION  ───────── -->
+<canvas id="confetti"></canvas>
+<div class="party" id="party">
+  <div class="card">
+    <img class="poster" id="pPoster" alt="">
+    <div class="kicker">🎉 New season announced</div>
+    <h2 id="pSeason">Season 2</h2>
+    <div class="name" id="pName">—</div>
+    <div class="when" id="pWhen">—</div>
+    <button class="go" id="pGo">Let's go</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+/* ═══════════════════════════════════════════════════════════════
+   CONFIG — paste your Firebase web config here.
+   Leave apiKey blank to run in local (no-login) mode.
+   ═══════════════════════════════════════════════════════════════ */
+const CONFIG = {
+  firebase: {
+    apiKey:            "AIzaSyDUpuWFieuz_q2kQLwoUXndzeLBWXTjsxw",
+    authDomain:        "tv-calendar-419aa.firebaseapp.com",
+    projectId:         "tv-calendar-419aa",
+    storageBucket:     "tv-calendar-419aa.firebasestorage.app",
+    messagingSenderId: "973118024099",
+    appId:             "1:973118024099:web:df3ab261e0a29c6e709216"
+  },
+  // Only these Google accounts may read/write the shared list.
+  // Leave empty [] to allow anyone who signs in. MUST ALSO be mirrored
+  // in firestore.rules — this list is convenience, those rules are security.
+  // To share the calendar, add the other person's Gmail address here AND
+  // in firestore.rules, then re-publish the rules in the Firebase console.
+  allowlist: [
+    "johncap.pt@gmail.com"
+  ],
+  // Firestore collection holding the one shared watchlist.
+  collection: "watchlist"
+};
+
+/* ═══════════════════  SMALL UTILITIES  ═══════════════════ */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const DAY = 86400000;
+const DOW = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+
+/** Stable pair of hues from a show id, so each show keeps its colour. */
+function hues(id){
+  let h = 0;
+  const s = String(id);
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  const a = h % 360;
+  return `--h:${a};--h2:${(a + 48) % 360}`;
+}
+
+/** Local midnight for a date. */
+const midnight = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+/** Monday-start week for a date. */
+function weekStart(d){
+  const x = midnight(d);
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+/** Local YYYY-MM-DD key — never use toISOString(), it shifts by timezone. */
+const key = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+/** Whole calendar days from today to d (negative = past). */
+const daysAway = d => Math.round((midnight(d) - midnight(new Date())) / DAY);
+
+const fmtTime = d => d.toLocaleTimeString([], { hour:"numeric", minute:"2-digit" });
+const fmtDate = d => `${DOW[(d.getDay()+6)%7]} ${d.getDate()} ${MON[d.getMonth()]}`;
+
+let toastT;
+function toast(msg){
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("on");
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove("on"), 2600);
+}
+
+/* ═══════════════════  TVMAZE  ═══════════════════
+   Free, no API key, CORS-enabled. Rate limit is roughly 20 calls per
+   10s per IP, so requests run through a small concurrency gate and
+   episode lists are cached in localStorage for 12 hours.            */
+const API = "https://api.tvmaze.com";
+const EP_TTL = 12 * 3600 * 1000;
+
+const cacheGet = (k, ttl) => {
+  try {
+    const r = JSON.parse(localStorage.getItem(k) || "null");
+    return r && Date.now() - r.t < ttl ? r.v : null;
+  } catch { return null; }
+};
+const cacheSet = (k, v) => {
+  try { localStorage.setItem(k, JSON.stringify({ t: Date.now(), v })); } catch {}
+};
+
+let inFlight = 0;
+const queue = [];
+function gate(fn){
+  return new Promise((res, rej) => {
+    queue.push({ fn, res, rej });
+    pump();
+  });
+}
+function pump(){
+  while (inFlight < 3 && queue.length){
+    const job = queue.shift();
+    inFlight++;
+    job.fn()
+      .then(job.res, job.rej)
+      .finally(() => { inFlight--; pump(); });
+  }
+}
+
+async function api(path){
+  const r = await fetch(API + path, { headers: { Accept: "application/json" } });
+  if (r.status === 429) throw new Error("TVmaze is rate-limiting — try again shortly.");
+  if (!r.ok) throw new Error(`TVmaze ${r.status}`);
+  return r.json();
+}
+
+async function searchShows(q){
+  const rows = await gate(() => api("/search/shows?q=" + encodeURIComponent(q)));
+  return rows.map(r => r.show);
+}
+
+/** Episodes for a show, normalised and sorted. Specials are excluded. */
+async function getEpisodes(showId, force = false){
+  const k = "st:ep:" + showId;
+  if (!force){
+    const c = cacheGet(k, EP_TTL);
+    if (c) return c;
+  }
+  const raw = await gate(() => api(`/shows/${showId}/episodes`));
+  const eps = raw
+    .filter(e => e.season > 0 && (e.airstamp || e.airdate))
+    .map(e => ({
+      season: e.season,
+      number: e.number,
+      // TVmaze uses the literal string "TBA" for unannounced titles —
+      // better to show nothing than to show "TBA".
+      name:   /^tba$/i.test(e.name || "") ? "" : (e.name || ""),
+      // airstamp carries the network's timezone; converting it to the
+      // viewer's local clock is what actually answers "when can I watch".
+      at:     e.airstamp || `${e.airdate}T${e.airtime || "20:00"}:00`,
+      type:   e.type || "regular"
+    }))
+    .sort((a, b) => new Date(a.at) - new Date(b.at));
+  cacheSet(k, eps);
+  return eps;
+}
+
+/* ═══════════════════  STORE  ═══════════════════
+   Two interchangeable backends: Firestore (shared, signed in) and
+   localStorage (single device, for trying the app out).            */
+const LOCAL_KEY = "st:local:shows";
+let store = null, mode = "local", me = null;
+
+function localStore(){
+  let subs = [];
+  const read  = () => { try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]"); } catch { return []; } };
+  const write = v  => { localStorage.setItem(LOCAL_KEY, JSON.stringify(v)); subs.forEach(f => f(read())); };
+  return {
+    subscribe(f){ subs.push(f); f(read()); return () => { subs = subs.filter(x => x !== f); }; },
+    add(show){ const v = read(); if (!v.some(s => s.id === show.id)) { v.push(show); write(v); } },
+    remove(id){ write(read().filter(s => s.id !== id)); },
+    patch(id, fields){ write(read().map(s => s.id === id ? { ...s, ...fields } : s)); }
+  };
+}
+
+async function firebaseStore(db, fs){
+  const col = fs.collection(db, CONFIG.collection);
+  return {
+    subscribe(f){
+      return fs.onSnapshot(col,
+        snap => f(snap.docs.map(d => ({ ...d.data(), id: Number(d.id) }))),
+        err  => { console.error(err); toast("Could not read the list — check Firestore rules."); });
+    },
+    async add(show){
+      const { id, ...rest } = show;
+      await fs.setDoc(fs.doc(col, String(id)), { ...rest, addedBy: me?.email || "", addedAt: Date.now() }, { merge: true });
+    },
+    async remove(id){ await fs.deleteDoc(fs.doc(col, String(id))); },
+    async patch(id, fields){ await fs.setDoc(fs.doc(col, String(id)), fields, { merge: true }); }
+  };
+}
+
+/* ═══════════════════  APP STATE  ═══════════════════ */
+let shows   = [];          // watchlist docs
+let epsById = new Map();   // showId -> episodes[]
+let anchor  = weekStart(new Date());
+let selKey  = null;
+const partyQueue = [];
+
+/* ═══════════════════  DATA REFRESH  ═══════════════════ */
+async function refreshEpisodes(force = false){
+  const jobs = shows.map(async s => {
+    try {
+      const eps = await getEpisodes(s.id, force);
+      epsById.set(s.id, eps);
+      detectNewSeason(s, eps);
+    } catch (e){
+      console.warn("episodes", s.id, e);
+      if (!epsById.has(s.id)) epsById.set(s.id, []);
+    }
+  });
+  await Promise.all(jobs);
+  render();
+}
+
+/* No API exposes a "renewed!" flag, so we derive it: remember the highest
+   season we have ever seen for a show, and celebrate when a higher one
+   shows up in a later fetch. maxSeason is seeded when the show is added,
+   so adding a show never fires a false celebration. */
+function detectNewSeason(show, eps){
+  if (!eps.length) return;
+  const top = Math.max(...eps.map(e => e.season));
+  const known = Number.isFinite(show.maxSeason) ? show.maxSeason : top;
+
+  if (top > known){
+    const first = eps.find(e => e.season === top);
+    store.patch(show.id, {
+      maxSeason: top,
+      announce: { season: top, at: Date.now(), firstAir: first ? first.at : null }
+    });
+    show.maxSeason = top;
+    show.announce  = { season: top, at: Date.now(), firstAir: first ? first.at : null };
+  } else if (!Number.isFinite(show.maxSeason)){
+    store.patch(show.id, { maxSeason: top });
+    show.maxSeason = top;
+  }
+
+  // Each person celebrates once on their own device.
+  const a = show.announce;
+  if (a && Date.now() - a.at < 30 * DAY){
+    const seen = `st:seen:${show.id}:${a.season}`;
+    if (!localStorage.getItem(seen)){
+      localStorage.setItem(seen, "1");
+      partyQueue.push({ show, ann: a });
+    }
+  }
+}
+
+/* ═══════════════════  RENDER: WEEK  ═══════════════════ */
+function weekEpisodes(){
+  const from = anchor.getTime();
+  const to   = from + 7 * DAY;
+  const out  = [];
+  for (const s of shows){
+    for (const e of epsById.get(s.id) || []){
+      const d = new Date(e.at);
+      if (d >= from && d < to) out.push({ ...e, show: s, date: d });
+    }
+  }
+  return out.sort((a, b) => a.date - b.date);
+}
+
+function stateOf(ep){
+  const now = Date.now();
+  const t   = ep.date.getTime();
+  if (ep.number === 1)                    return ["prem", `S${ep.season} Premiere`];
+  if (ep.type === "significant_special")  return ["fin",  "Special"];
+  if (t <= now)                           return ["out",  "Aired"];
+  if (t - now < 6 * 3600 * 1000)          return ["soon", "Tonight"];
+  return null;
+}
+
+function renderStrip(byDay){
+  const today = key(new Date());
+  $("#strip").innerHTML = Array.from({ length: 7 }, (_, i) => {
+    const d  = new Date(anchor.getTime() + i * DAY);
+    const k  = key(d);
+    const es = byDay.get(k) || [];
+    const pips = es.slice(0, 3)
+      .map(e => `<i style="${hues(e.show.id)};background:hsl(var(--h) 92% 66%)"></i>`).join("");
+    const cls = [
+      "day",
+      k === today ? "today" : "",
+      k === selKey ? "sel" : "",
+      es.length ? "" : "empty"
+    ].join(" ");
+    return `<button class="${cls}" data-day="${k}">
+      <div class="dow">${DOW[i]}</div>
+      <div class="num">${d.getDate()}</div>
+      <div class="pips">${pips}</div>
+    </button>`;
+  }).join("");
+}
+
+function render(){
+  const eps   = weekEpisodes();
+  const byDay = new Map();
+  for (const e of eps){
+    const k = key(e.date);
+    if (!byDay.has(k)) byDay.set(k, []);
+    byDay.get(k).push(e);
+  }
+
+  // header
+  const end = new Date(anchor.getTime() + 6 * DAY);
+  const sameMonth = anchor.getMonth() === end.getMonth();
+  $("#wRange").textContent = sameMonth
+    ? `${anchor.getDate()}–${end.getDate()} ${MON[end.getMonth()]}`
+    : `${anchor.getDate()} ${MON[anchor.getMonth()]} – ${end.getDate()} ${MON[end.getMonth()]}`;
+  const off = Math.round((anchor - weekStart(new Date())) / (7 * DAY));
+  $("#wSub").textContent =
+    off === 0 ? `This week · ${eps.length} episode${eps.length === 1 ? "" : "s"}`
+    : off === 1 ? `Next week · ${eps.length} episode${eps.length === 1 ? "" : "s"}`
+    : off === -1 ? `Last week · ${eps.length} episode${eps.length === 1 ? "" : "s"}`
+    : `${off > 0 ? "In" : ""} ${Math.abs(off)} weeks ${off > 0 ? "" : "ago"} · ${eps.length} episode${eps.length === 1 ? "" : "s"}`;
+  $("#nowBtn").classList.toggle("hidden", off === 0);
+  $("#wSub").textContent = $("#wSub").textContent.replace(/\s+/g, " ").trim();
+
+  renderStrip(byDay);
+
+  // board
+  const board = $("#board");
+  if (!shows.length){
+    board.innerHTML = `<div class="empty-week">
+      <div class="em">🍿</div><h3>No shows yet</h3>
+      <p>Tap <b>Add show</b> and search for something you love. Every episode lands straight in the calendar.</p></div>`;
+  } else if (!eps.length){
+    board.innerHTML = `<div class="empty-week">
+      <div class="em">🌙</div><h3>Quiet week</h3>
+      <p>Nothing airing between ${fmtDate(anchor)} and ${fmtDate(end)}. Check the countdown panel for what's next.</p></div>`;
+  } else {
+    const todayK = key(new Date());
+    board.innerHTML = [...byDay.entries()].map(([k, list]) => {
+      const d = list[0].date;
+      return `<section class="dayblock" id="d-${k}">
+        <div class="dayhead">
+          <h3>${fmtDate(d)}</h3>
+          ${k === todayK ? '<span class="tag">Today</span>' : ""}
+          <span class="meta">${list.length} ep${list.length === 1 ? "" : "s"}</span>
+        </div>
+        ${list.map(epCard).join("")}
+      </section>`;
+    }).join("");
+  }
+
+  renderRail();
+  renderMyShows();
+  drainParty();
+}
+
+function epCard(e){
+  const st  = stateOf(e);
+  const img = e.show.image
+    ? `<img class="poster" src="${esc(e.show.image)}" alt="" loading="lazy">`
+    : `<div class="poster"></div>`;
+  return `<button class="ep" style="${hues(e.show.id)}" data-show="${e.show.id}">
+    ${img}
+    <div class="txt">
+      <div class="show">${esc(e.show.name)}</div>
+      <div class="code">S${String(e.season).padStart(2,"0")}E${String(e.number).padStart(2,"0")}</div>
+      ${e.name ? `<div class="title">${esc(e.name)}</div>` : ""}
+    </div>
+    <div class="right">
+      <div class="time">${fmtTime(e.date)}</div>
+      ${st ? `<div class="state ${st[0]}">${esc(st[1])}</div>` : ""}
+    </div>
+  </button>`;
+}
+
+/* ═══════════════════  RENDER: COUNTDOWN RAIL  ═══════════════════ */
+function nextEpisode(showId){
+  const now = Date.now();
+  return (epsById.get(showId) || []).find(e => new Date(e.at).getTime() + 30 * 60000 > now) || null;
+}
+
+/** "how many days / weeks until" — days up to a fortnight, then weeks. */
+function countdown(date){
+  const d = daysAway(date);
+  const mins = (date - Date.now()) / 60000;
+  if (mins <= 0 && mins > -180) return { n: "Airing now", u: "", now: true };
+  if (d === 0)  return { n: "Today",    u: fmtTime(date), now: true };
+  if (d === 1)  return { n: "1",        u: "day" };
+  if (d < 14)   return { n: String(d),  u: "days" };
+  const w = Math.round(d / 7);
+  if (w < 9)    return { n: String(w),  u: w === 1 ? "week" : "weeks" };
+  const m = Math.round(d / 30.44);
+  return { n: String(m), u: m === 1 ? "month" : "months" };
+}
+
+function renderRail(){
+  const rows = shows.map(s => {
+    const e = nextEpisode(s.id);
+    return { s, e, date: e ? new Date(e.at) : null };
+  }).sort((a, b) => {
+    if (a.date && b.date) return a.date - b.date;
+    return a.date ? -1 : b.date ? 1 : a.s.name.localeCompare(b.s.name);
+  });
+
+  const upcoming = rows.filter(r => r.date).length;
+  const badge = $("#railBadge");
+  badge.textContent = upcoming;
+  badge.classList.toggle("hidden", !upcoming);
+
+  if (!rows.length){
+    $("#railList").innerHTML = `<div class="none">Nothing tracked yet. Add a show and its countdown appears here.</div>`;
+    return;
+  }
+
+  $("#railList").innerHTML = rows.map(({ s, e, date }) => {
+    const img = s.image ? `<img class="poster" src="${esc(s.image)}" alt="" loading="lazy">` : `<div class="poster"></div>`;
+    const fresh = s.announce && Date.now() - s.announce.at < 14 * DAY;
+
+    if (!date){
+      const why = /ended|to be determined|in development/i.test(s.status || "")
+        ? esc(s.status) : "No date announced";
+      return `<div class="cd tba" style="${hues(s.id)}">
+        ${img}
+        <div class="txt"><div class="show">${esc(s.name)}</div><div class="sub">${why}</div></div>
+        <div class="big"><span class="n">TBA</span></div>
+      </div>`;
+    }
+
+    const c = countdown(date);
+    return `<div class="cd ${c.now ? "now" : ""}" style="${hues(s.id)}">
+      ${fresh ? '<span class="flare">🎉</span>' : ""}
+      ${img}
+      <div class="txt">
+        <div class="show">${esc(s.name)}</div>
+        <div class="sub">S${String(e.season).padStart(2,"0")}E${String(e.number).padStart(2,"0")} · ${fmtDate(date)}</div>
+      </div>
+      <div class="big"><span class="n">${esc(c.n)}</span>${c.u ? `<span class="u">${esc(c.u)}</span>` : ""}</div>
+    </div>`;
+  }).join("");
+}
+
+/* ═══════════════════  RENDER: MY SHOWS  ═══════════════════ */
+function renderMyShows(){
+  const box = $("#myShows");
+  const head = me
+    ? `<div class="me">
+         ${me.photoURL ? `<img src="${esc(me.photoURL)}" alt="">` : ""}
+         <div class="txt"><div class="n">${esc(me.displayName || "Signed in")}</div><div class="m">${esc(me.email || "")}</div></div>
+         <button class="pill have" id="signout">Sign out</button>
+       </div>`
+    : `<div class="me">
+         <div class="txt"><div class="n">Local mode</div><div class="m">Saved on this device only</div></div>
+       </div>`;
+
+  const list = shows.length
+    ? [...shows].sort((a, b) => a.name.localeCompare(b.name)).map(s => `
+        <div class="res" style="${hues(s.id)}">
+          ${s.image ? `<img class="poster" src="${esc(s.image)}" alt="" loading="lazy">` : `<div class="poster"></div>`}
+          <div class="txt">
+            <div class="n">${esc(s.name)}</div>
+            <div class="m">${esc([s.network, s.status, s.maxSeason ? `${s.maxSeason} season${s.maxSeason === 1 ? "" : "s"}` : ""].filter(Boolean).join(" · "))}</div>
+          </div>
+          <button class="pill kill" data-remove="${s.id}">Remove</button>
+        </div>`).join("")
+    : `<div class="hint">No shows tracked yet.</div>`;
+
+  box.innerHTML = head + list;
+}
+
+/* ═══════════════════  SEARCH  ═══════════════════ */
+let searchT, searchSeq = 0;
+$("#q").addEventListener("input", e => {
+  const q = e.target.value.trim();
+  clearTimeout(searchT);
+  if (!q){
+    $("#results").innerHTML = `<div class="hint">Type a show name to search.<br>Powered by TVmaze — no API key needed.</div>`;
+    return;
+  }
+  searchT = setTimeout(() => runSearch(q), 320);
+});
+
+async function runSearch(q){
+  const seq = ++searchSeq;
+  $("#results").innerHTML = `<div class="hint">Searching…</div>`;
+  try {
+    const rows = await searchShows(q);
+    if (seq !== searchSeq) return;              // a newer keystroke won
+    if (!rows.length){
+      $("#results").innerHTML = `<div class="hint">Nothing found for “${esc(q)}”.</div>`;
+      return;
+    }
+    $("#results").innerHTML = rows.slice(0, 20).map(sh => {
+      const have = shows.some(s => s.id === sh.id);
+      const meta = [
+        sh.premiered ? sh.premiered.slice(0, 4) : "",
+        sh.network?.name || sh.webChannel?.name || "",
+        sh.status || ""
+      ].filter(Boolean).join(" · ");
+      const img = sh.image?.medium
+        ? `<img class="poster" src="${esc(sh.image.medium)}" alt="" loading="lazy">`
+        : `<div class="poster"></div>`;
+      return `<div class="res" style="${hues(sh.id)}">
+        ${img}
+        <div class="txt"><div class="n">${esc(sh.name)}</div><div class="m">${esc(meta)}</div></div>
+        <button class="pill ${have ? "have" : ""}" data-add="${sh.id}" ${have ? "disabled" : ""}>${have ? "Added" : "Add"}</button>
+      </div>`;
+    }).join("");
+    window.__lastSearch = rows;
+  } catch (err){
+    if (seq !== searchSeq) return;
+    $("#results").innerHTML = `<div class="hint">${esc(err.message)}</div>`;
+  }
+}
+
+$("#results").addEventListener("click", async e => {
+  const btn = e.target.closest("[data-add]");
+  if (!btn) return;
+  const id = Number(btn.dataset.add);
+  const sh = (window.__lastSearch || []).find(s => s.id === id);
+  if (!sh) return;
+
+  btn.disabled = true;
+  btn.textContent = "Adding…";
+  try {
+    const eps = await getEpisodes(id, true);
+    await store.add({
+      id,
+      name:    sh.name,
+      image:   sh.image?.medium || sh.image?.original || "",
+      network: sh.network?.name || sh.webChannel?.name || "",
+      status:  sh.status || "",
+      // Seed maxSeason so adding a show never triggers a false celebration.
+      maxSeason: eps.length ? Math.max(...eps.map(x => x.season)) : 0
+    });
+    epsById.set(id, eps);
+    btn.className = "pill have";
+    btn.textContent = "Added";
+    toast(`${sh.name} added`);
+    render();
+  } catch (err){
+    btn.disabled = false;
+    btn.textContent = "Add";
+    toast(err.message || "Could not add that show");
+  }
+});
+
+$("#myShows").addEventListener("click", async e => {
+  const kill = e.target.closest("[data-remove]");
+  if (kill){
+    const id = Number(kill.dataset.remove);
+    const s = shows.find(x => x.id === id);
+    if (!confirm(`Stop tracking ${s ? s.name : "this show"}?`)) return;
+    await store.remove(id);
+    epsById.delete(id);
+    toast("Removed");
+    return;
+  }
+  if (e.target.id === "signout"){
+    localStorage.removeItem("st:mode");
+    const { getAuth, signOut } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js");
+    await signOut(getAuth());
+    location.reload();
+  }
+});
+
+/* ═══════════════════  SHEETS & NAV  ═══════════════════ */
+function openSheet(el){
+  $("#scrim").classList.add("on");
+  el.classList.add("on");
+  if (el.id === "searchSheet") setTimeout(() => $("#q").focus(), 340);
+}
+function closeSheets(){
+  $("#scrim").classList.remove("on");
+  $$(".sheet").forEach(s => s.classList.remove("on"));
+}
+$("#scrim").addEventListener("click", closeSheets);
+$$("[data-close]").forEach(b => b.addEventListener("click", closeSheets));
+$("#fab").addEventListener("click", () => openSheet($("#searchSheet")));
+$("#showsBtn").addEventListener("click", () => { renderMyShows(); openSheet($("#showsSheet")); });
+$("#meBtn").addEventListener("click", () => { renderMyShows(); openSheet($("#showsSheet")); });
+
+function openRail(on){
+  $("#rail").classList.toggle("on", on);
+  $("#railBack").classList.toggle("on", on);
+}
+$("#railBtn").addEventListener("click", () => openRail(!$("#rail").classList.contains("on")));
+$("#railBack").addEventListener("click", () => openRail(false));
+
+function goWeek(delta){
+  anchor = new Date(anchor.getTime() + delta * 7 * DAY);
+  selKey = null;
+  const b = $("#board");
+  b.style.setProperty("--dx", delta > 0 ? "22px" : "-22px");
+  b.classList.remove("swap"); void b.offsetWidth; b.classList.add("swap");
+  render();
+}
+$("#prevW").addEventListener("click", () => goWeek(-1));
+$("#nextW").addEventListener("click", () => goWeek(1));
+$("#nowBtn").addEventListener("click", () => {
+  anchor = weekStart(new Date());
+  selKey = key(new Date());
+  render();
+  const el = $("#d-" + selKey);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  else window.scrollTo({ top: 0, behavior: "smooth" });
+});
+
+$("#strip").addEventListener("click", e => {
+  const b = e.target.closest("[data-day]");
+  if (!b) return;
+  selKey = b.dataset.day === selKey ? null : b.dataset.day;
+  render();
+  const el = selKey && $("#d-" + selKey);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+// swipe between weeks
+let sx = 0, sy = 0, tracking = false;
+$("#board").addEventListener("touchstart", e => {
+  if (e.touches.length !== 1) return;
+  sx = e.touches[0].clientX; sy = e.touches[0].clientY; tracking = true;
+}, { passive: true });
+$("#board").addEventListener("touchend", e => {
+  if (!tracking) return;
+  tracking = false;
+  const dx = e.changedTouches[0].clientX - sx;
+  const dy = e.changedTouches[0].clientY - sy;
+  if (Math.abs(dx) > 62 && Math.abs(dx) > Math.abs(dy) * 1.7) goWeek(dx < 0 ? 1 : -1);
+}, { passive: true });
+
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.key === "ArrowLeft")  goWeek(-1);
+  if (e.key === "ArrowRight") goWeek(1);
+  if (e.key === "t" || e.key === "T") $("#nowBtn").click();
+  if (e.key === "Escape") { closeSheets(); openRail(false); }
+});
+
+/* ═══════════════════  CELEBRATION  ═══════════════════ */
+const cv = $("#confetti"), ctx = cv.getContext("2d");
+let bits = [], raf = 0;
+
+function burst(){
+  cv.width  = innerWidth  * devicePixelRatio;
+  cv.height = innerHeight * devicePixelRatio;
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  cv.classList.add("on");
+  const cols = ["#ff2d7a","#8b5cf6","#22d3ee","#a3e635","#fbbf24","#ffffff"];
+  bits = Array.from({ length: 130 }, () => ({
+    x: innerWidth / 2 + (Math.random() - .5) * 120,
+    y: innerHeight * .42,
+    vx: (Math.random() - .5) * 15,
+    vy: -Math.random() * 15 - 5,
+    g: .34 + Math.random() * .2,
+    w: 5 + Math.random() * 7,
+    h: 8 + Math.random() * 9,
+    r: Math.random() * Math.PI,
+    vr: (Math.random() - .5) * .3,
+    c: cols[(Math.random() * cols.length) | 0],
+    life: 150 + Math.random() * 90
+  }));
+  cancelAnimationFrame(raf);
+  tick();
+}
+function tick(){
+  ctx.clearRect(0, 0, innerWidth, innerHeight);
+  let alive = 0;
+  for (const b of bits){
+    if (b.life-- <= 0) continue;
+    alive++;
+    b.vy += b.g; b.vx *= .995;
+    b.x += b.vx; b.y += b.vy; b.r += b.vr;
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.r);
+    ctx.globalAlpha = Math.min(1, b.life / 45);
+    ctx.fillStyle = b.c;
+    ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+    ctx.restore();
+  }
+  if (alive) raf = requestAnimationFrame(tick);
+  else { ctx.clearRect(0, 0, innerWidth, innerHeight); cv.classList.remove("on"); }
+}
+
+let partying = false;
+function drainParty(){
+  if (partying || !partyQueue.length) return;
+  const { show, ann } = partyQueue.shift();
+  partying = true;
+
+  $("#pPoster").src = show.image || "";
+  $("#pPoster").style.cssText = hues(show.id);
+  $("#pSeason").textContent = `Season ${ann.season}`;
+  $("#pName").textContent   = show.name;
+  $("#pWhen").textContent   = ann.firstAir
+    ? `First episode ${fmtDate(new Date(ann.firstAir))} · ${countdownWords(new Date(ann.firstAir))}`
+    : "Air date not announced yet";
+  $("#party").classList.add("on");
+  burst();
+  if (navigator.vibrate) navigator.vibrate([16, 60, 16]);
+}
+function countdownWords(d){
+  const c = countdown(d);
+  return c.u ? `${c.n} ${c.u} away` : c.n;
+}
+$("#pGo").addEventListener("click", () => {
+  $("#party").classList.remove("on");
+  partying = false;
+  setTimeout(drainParty, 260);
+});
+
+/* ═══════════════════  BOOT  ═══════════════════ */
+function showApp(){
+  $("#gate").classList.remove("on");
+  $("#shell").classList.add("on");
+}
+
+function attachStore(){
+  store.subscribe(list => {
+    shows = list;
+    // Fetch episodes for anything new, then repaint.
+    const missing = shows.filter(s => !epsById.has(s.id));
+    render();
+    if (missing.length) refreshEpisodes();
+  });
+}
+
+function startLocal(){
+  mode = "local";
+  store = localStore();
+  $("#localChip").classList.remove("hidden");
+  localStorage.setItem("st:mode", "local");
+  showApp();
+  attachStore();
+  refreshEpisodes();
+}
+
+async function startFirebase(){
+  const [{ initializeApp }, auth, fs] = await Promise.all([
+    import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js"),
+    import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js"),
+    import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js")
+  ]);
+  const app = initializeApp(CONFIG.firebase);
+  const A   = auth.getAuth(app);
+  const db  = fs.getFirestore(app);
+
+  $("#gsignin").addEventListener("click", async () => {
+    try {
+      await auth.signInWithPopup(A, new auth.GoogleAuthProvider());
+    } catch (err){
+      // Popups are unreliable in the iOS home-screen web app; fall back.
+      if (/popup/i.test(err.code || "")) await auth.signInWithRedirect(A, new auth.GoogleAuthProvider());
+      else gateError(err.message);
+    }
+  });
+
+  auth.onAuthStateChanged(A, async user => {
+    if (!user){ $("#gate").classList.add("on"); $("#shell").classList.remove("on"); return; }
+    const email = (user.email || "").toLowerCase();
+    if (CONFIG.allowlist.length && !CONFIG.allowlist.map(x => x.toLowerCase()).includes(email)){
+      await auth.signOut(A);
+      gateError(`${email} isn't on the guest list for this calendar.`);
+      return;
+    }
+    me = user;
+    mode = "cloud";
+    $("#meBtn").classList.remove("hidden");
+    if (user.photoURL){ $("#meAvatar").src = user.photoURL; $("#meAvatar").classList.remove("hidden"); }
+    store = await firebaseStore(db, fs);
+    showApp();
+    attachStore();
+    refreshEpisodes();
+  });
+}
+
+function gateError(msg){
+  $("#gateMsg").innerHTML = `<span class="err">${esc(msg)}</span>`;
+}
+
+function boot(){
+  const configured = !!CONFIG.firebase.apiKey && !!CONFIG.firebase.projectId;
+
+  if (!configured){
+    $("#gsignin").classList.add("hidden");
+    $("#glocal").classList.remove("hidden");
+    $("#gsetup").classList.remove("hidden");
+    $("#gsetup").innerHTML = `<b>Firebase isn't configured yet.</b><br>
+      Open <code>index.html</code>, find the <code>CONFIG</code> block near the top of the script,
+      and paste your Firebase web config in. Until then you can use the app in local mode —
+      your list is saved in this browser only. See <code>README.md</code> for the 5-minute setup.`;
+    $("#glocal").addEventListener("click", startLocal);
+    // Don't make local-mode users re-opt-in on every reload.
+    if (localStorage.getItem("st:mode") === "local") startLocal();
+    return;
+  }
+
+  $("#glocal").classList.remove("hidden");
+  $("#glocal").addEventListener("click", startLocal);
+  if (localStorage.getItem("st:mode") === "local"){ startLocal(); return; }
+
+  startFirebase().catch(err => {
+    console.error(err);
+    gateError("Firebase failed to load: " + err.message);
+    $("#glocal").classList.remove("hidden");
+  });
+}
+
+// Keep countdowns honest across midnight / long-lived tabs.
+setInterval(() => { if (shows.length) renderRail(); }, 60000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && shows.length) refreshEpisodes();
+});
+
+boot();
+</script>
+</body>
+</html>
