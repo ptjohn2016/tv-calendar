@@ -35,7 +35,11 @@
   --rail-w:332px;
   --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Inter,system-ui,sans-serif;
 }
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+/* "manipulation" = normal panning and pinch-zoom, minus double-tap-to-zoom.
+   iOS ignores maximum-scale in the viewport tag, so this is the only thing
+   that actually stops a quick double tap from zooming the page. Pinch-zoom
+   deliberately still works — don't swap this for user-scalable=no. */
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 html,body{height:100%}
 body{
   margin:0;font-family:var(--font);background:var(--bg);color:var(--ink);
