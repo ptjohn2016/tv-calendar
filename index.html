@@ -226,12 +226,52 @@ img{display:block}
 .dayhead.is-past{opacity:.6}
 .dayhead.is-past .dnum{background:none;-webkit-text-fill-color:var(--ink-faint);color:var(--ink-faint)}
 
-.ep{
-  display:flex;gap:12px;align-items:center;padding:10px;margin-bottom:9px;
-  border-radius:var(--r-md);position:relative;overflow:hidden;width:100%;text-align:left;
-  background:var(--glass);border:1px solid var(--stroke);transition:transform .14s,border-color .2s;
+/* Each card sits in a clipping wrapper so the swipe action can be revealed
+   behind it as the card is dragged aside. */
+.epwrap{position:relative;margin-bottom:9px;border-radius:var(--r-md);overflow:hidden;transition:background .16s}
+.epwrap.revealing{background:rgba(163,230,53,.14)}
+.epwrap.will-fire{background:rgba(163,230,53,.30)}
+.epwrap.is-watched.revealing{background:rgba(255,255,255,.07)}
+.epwrap.is-watched.will-fire{background:rgba(255,255,255,.15)}
+.epwrap .reveal{
+  position:absolute;inset:0;display:flex;align-items:center;padding:0 20px;
+  font-size:11.5px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;
+  opacity:0;transition:opacity .16s;pointer-events:none;
 }
-.ep:active{transform:scale(.985);border-color:var(--stroke-hi)}
+.epwrap.revealing .reveal{opacity:1}
+.epwrap .mark{margin-left:auto;color:var(--lime)}
+.epwrap .unmark{margin-right:auto;color:var(--ink-dim)}
+.epwrap.is-watched .mark{display:none}
+.epwrap:not(.is-watched) .unmark{display:none}
+
+.ep{
+  display:flex;gap:12px;align-items:center;padding:10px;
+  border-radius:var(--r-md);position:relative;overflow:hidden;width:100%;text-align:left;
+  background:var(--glass);border:1px solid var(--stroke);
+  /* pan-y hands vertical scrolling to the browser and horizontal to us */
+  touch-action:pan-y;z-index:1;
+  transition:transform .26s cubic-bezier(.2,.9,.3,1),border-color .2s,opacity .2s;
+}
+/* Watched episodes fade back so the unwatched ones carry the week. */
+.ep.watched{opacity:.42}
+.ep.watched .poster{filter:grayscale(1)}
+.ep.watched .show{text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:var(--ink-faint)}
+.state.seen{background:rgba(255,255,255,.13);color:var(--ink-dim)}
+
+/* Swipe is the touch affordance; pointer devices get a tick on hover. */
+.seenbtn{display:none}
+@media (hover:hover) and (pointer:fine){
+  .seenbtn{
+    display:grid;place-items:center;position:absolute;right:9px;top:50%;
+    transform:translateY(-50%) scale(.85);z-index:3;
+    width:32px;height:32px;border-radius:10px;font-size:14px;font-weight:800;
+    background:rgba(23,13,45,.95);border:1px solid var(--stroke);color:var(--ink-faint);
+    opacity:0;transition:opacity .15s,transform .15s,color .15s;
+  }
+  .epwrap:hover .seenbtn{opacity:1;transform:translateY(-50%) scale(1)}
+  .seenbtn:hover{border-color:var(--stroke-hi);color:var(--lime)}
+  .epwrap.is-watched .seenbtn{color:var(--lime)}
+}
 .ep::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3.5px;background:linear-gradient(180deg,hsl(var(--h) 92% 68%),hsl(var(--h2) 92% 60%))}
 .ep::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.14;background:radial-gradient(120% 100% at 0% 50%,hsl(var(--h) 92% 60%),transparent 58%)}
 .ep .poster{width:46px;height:66px;flex:0 0 46px;border-radius:9px;object-fit:cover;background:linear-gradient(150deg,hsl(var(--h) 55% 26%),hsl(var(--h2) 55% 17%));border:1px solid var(--stroke)}
@@ -614,6 +654,18 @@ const daysAway = d => Math.round((midnight(d) - midnight(new Date())) / DAY);
 const fmtTime = d => d.toLocaleTimeString([], { hour:"numeric", minute:"2-digit" });
 const fmtDate = d => `${DOW[(d.getDay()+6)%7]} ${d.getDate()} ${MON[d.getMonth()]}`;
 
+/* Haptics where they exist. iOS Safari has no Vibration API at all, and
+   Chrome throws if the page hasn't been tapped yet — neither is worth an
+   error in the console. */
+const buzz = pattern => {
+  try {
+    // Chrome logs a console warning if this is called before the page has
+    // ever been interacted with, so check activation rather than let it fire.
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
+    navigator.vibrate?.(pattern);
+  } catch {}
+};
+
 let toastT;
 function toast(msg){
   const t = $("#toast");
@@ -813,6 +865,24 @@ function weekEpisodes(){
   return out.sort((a, b) => a.date - b.date);
 }
 
+/* ── Watched state ──────────────────────────────────────────────────
+   Kept as a { "season-number": true } map on the show's own document, so
+   it rides along with the shared watchlist and both of you see the same
+   ticks. Make it per-person by keying on the signed-in email instead.  */
+const epKey     = (season, number) => `${season}-${number}`;
+const isWatched = (show, ep) => !!(show.watched && show.watched[epKey(ep.season, ep.number)]);
+
+function setWatched(showId, season, number, on){
+  const show = shows.find(s => s.id === showId);
+  if (!show) return;
+  show.watched = { ...(show.watched || {}), [epKey(season, number)]: on };
+  // Send the whole map: the local backend replaces fields wholesale, and
+  // Firestore's merge is happy either way.
+  store.patch(showId, { watched: show.watched });
+  buzz(on ? 14 : 8);
+  render();
+}
+
 /** The network's own air date, when it differs from the local one — shown so
     a listing on TVmaze/IMDb can be matched up without doing the maths. */
 function listedAs(ep){
@@ -914,22 +984,33 @@ function render(){
 function epCard(e){
   const st     = stateOf(e);
   const listed = listedAs(e);
+  const seen = isWatched(e.show, e);
   const img = e.show.image
     ? `<img class="poster" src="${esc(e.show.image)}" alt="" loading="lazy">`
     : `<div class="poster"></div>`;
-  return `<button class="ep" style="${hues(e.show.id)}" data-show="${e.show.id}">
-    ${img}
-    <div class="txt">
-      <div class="show">${esc(e.show.name)}</div>
-      <div class="code">S${String(e.season).padStart(2,"0")}E${String(e.number).padStart(2,"0")}${
-        listed ? `<span class="listed" title="the date TVmaze and IMDb file this under, in the network's own timezone">${esc(listed)}</span>` : ""}</div>
-      ${e.name ? `<div class="title">${esc(e.name)}</div>` : ""}
+  const badge = seen ? `<div class="state seen">✓ Watched</div>`
+              : st   ? `<div class="state ${st[0]}">${esc(st[1])}</div>` : "";
+  return `<div class="epwrap ${seen ? "is-watched" : ""}">
+    <div class="reveal" aria-hidden="true">
+      <span class="unmark">↺ Unwatch</span>
+      <span class="mark">Watched ✓</span>
     </div>
-    <div class="right">
-      <div class="time">${fmtTime(e.date)}</div>
-      ${st ? `<div class="state ${st[0]}">${esc(st[1])}</div>` : ""}
-    </div>
-  </button>`;
+    <button class="seenbtn" type="button" aria-label="${seen ? "Mark unwatched" : "Mark watched"}">✓</button>
+    <button class="ep ${seen ? "watched" : ""}" style="${hues(e.show.id)}"
+            data-show="${e.show.id}" data-s="${e.season}" data-n="${e.number}">
+      ${img}
+      <div class="txt">
+        <div class="show">${esc(e.show.name)}</div>
+        <div class="code">S${String(e.season).padStart(2,"0")}E${String(e.number).padStart(2,"0")}${
+          listed ? `<span class="listed" title="the date TVmaze and IMDb file this under, in the network's own timezone">${esc(listed)}</span>` : ""}</div>
+        ${e.name ? `<div class="title">${esc(e.name)}</div>` : ""}
+      </div>
+      <div class="right">
+        <div class="time">${fmtTime(e.date)}</div>
+        ${badge}
+      </div>
+    </button>
+  </div>`;
 }
 
 /* ═══════════════════  RENDER: COUNTDOWN RAIL  ═══════════════════ */
@@ -1220,19 +1301,91 @@ $("#strip").addEventListener("click", e => {
   if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
-// swipe between weeks
-let sx = 0, sy = 0, tracking = false;
+/* ── Horizontal gestures ────────────────────────────────────────────
+   Two swipes share this surface: dragging an episode card marks it
+   watched/unwatched, dragging anywhere else flips the week. The axis and
+   the target are locked in once at the start of a gesture so the two can
+   never fight — a swipe that begins on a card NEVER changes the week.   */
+const FIRE = 70;          // px of travel needed to commit
+const MAXPULL = 132;      // how far a card can be dragged
+
+let sx = 0, sy = 0, axis = null, tracking = false, card = null;
+
+const wrapOf = el => el && el.closest(".epwrap");
+
+function resetCard(){
+  if (!card) return;
+  card.style.transition = "";
+  card.style.transform  = "";
+  const w = wrapOf(card);
+  if (w) w.classList.remove("revealing", "will-fire");
+  card = null;
+}
+
 $("#board").addEventListener("touchstart", e => {
   if (e.touches.length !== 1) return;
-  sx = e.touches[0].clientX; sy = e.touches[0].clientY; tracking = true;
+  resetCard();
+  sx = e.touches[0].clientX;
+  sy = e.touches[0].clientY;
+  axis = null;
+  tracking = true;
+  card = e.target.closest(".ep");
 }, { passive: true });
+
+$("#board").addEventListener("touchmove", e => {
+  if (!tracking || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - sx;
+  const dy = e.touches[0].clientY - sy;
+
+  if (!axis){
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;   // too small to call yet
+    axis = Math.abs(dx) > Math.abs(dy) * 1.3 ? "x" : "y";
+  }
+  if (axis !== "x" || !card) return;
+
+  e.preventDefault();                                   // we own this gesture now
+  const w = wrapOf(card);
+  const watched = w.classList.contains("is-watched");
+  // Only the meaningful direction gives: left to watch, right to unwatch.
+  let d = watched ? Math.max(0, dx) : Math.min(0, dx);
+  d = Math.max(-MAXPULL, Math.min(MAXPULL, d));
+
+  card.style.transition = "none";
+  card.style.transform  = `translateX(${d}px)`;
+  w.classList.toggle("revealing", Math.abs(d) > 4);
+  w.classList.toggle("will-fire", Math.abs(d) >= FIRE);
+}, { passive: false });
+
 $("#board").addEventListener("touchend", e => {
   if (!tracking) return;
   tracking = false;
   const dx = e.changedTouches[0].clientX - sx;
   const dy = e.changedTouches[0].clientY - sy;
-  if (Math.abs(dx) > 62 && Math.abs(dx) > Math.abs(dy) * 1.7) goWeek(dx < 0 ? 1 : -1);
+
+  if (card){
+    const c = card, w = wrapOf(c);
+    const watched = w.classList.contains("is-watched");
+    const fired = axis === "x" && Math.abs(dx) >= FIRE &&
+                  (watched ? dx > 0 : dx < 0);
+    resetCard();
+    if (fired) setWatched(+c.dataset.show, +c.dataset.s, +c.dataset.n, !watched);
+    return;                       // a card swipe never changes the week
+  }
+
+  if (axis === "x" && Math.abs(dx) > 62 && Math.abs(dx) > Math.abs(dy) * 1.7)
+    goWeek(dx < 0 ? 1 : -1);
 }, { passive: true });
+
+$("#board").addEventListener("touchcancel", () => { tracking = false; resetCard(); }, { passive: true });
+
+// Pointer devices can't swipe — a tick appears on the card on hover instead.
+$("#board").addEventListener("click", e => {
+  const b = e.target.closest(".seenbtn");
+  if (!b) return;
+  e.preventDefault();
+  const w = wrapOf(b), c = w.querySelector(".ep");
+  setWatched(+c.dataset.show, +c.dataset.s, +c.dataset.n, !w.classList.contains("is-watched"));
+});
 
 document.addEventListener("keydown", e => {
   if (e.target.tagName === "INPUT") return;
@@ -1303,7 +1456,7 @@ function drainParty(){
     : "Air date not announced yet";
   $("#party").classList.add("on");
   burst();
-  if (navigator.vibrate) navigator.vibrate([16, 60, 16]);
+  buzz([16, 60, 16]);
 }
 function countdownWords(d){
   const c = countdown(d);
