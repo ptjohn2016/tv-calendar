@@ -156,7 +156,8 @@ img{display:block}
 .weeknav{display:flex;align-items:center;gap:8px;margin-bottom:12px}
 .weeknav .range{flex:1;min-width:0}
 .weeknav .range h2{margin:0;font-size:16px;font-weight:800;letter-spacing:-.025em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.weeknav .range p{margin:1.5px 0 0;font-size:11.5px;color:var(--ink-faint);font-weight:650}
+.weeknav .range p{margin:1.5px 0 0;font-size:11.5px;color:var(--ink-faint);font-weight:650;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .nowbtn{
   height:44px;padding:0 15px;border-radius:14px;font-size:13.5px;font-weight:800;letter-spacing:-.015em;
   background:linear-gradient(96deg,var(--hot),var(--grape));color:#fff;
@@ -186,11 +187,44 @@ img{display:block}
 .board.swap{animation:swap .34s cubic-bezier(.2,.8,.3,1)}
 @keyframes swap{from{opacity:0;transform:translateX(var(--dx,18px))}to{opacity:1;transform:none}}
 
-.dayblock{margin-top:22px;scroll-margin-top:200px}
-.dayhead{display:flex;align-items:baseline;gap:9px;margin-bottom:11px;padding-left:2px}
-.dayhead h3{margin:0;font-size:14px;font-weight:850;letter-spacing:-.02em}
-.dayhead .meta{font-size:11.5px;color:var(--ink-faint);font-weight:700;margin-left:auto}
-.dayhead .tag{font-size:9.5px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:6px;background:var(--lime);color:#0b0618}
+.dayblock{margin-top:26px;scroll-margin-top:calc(var(--topbar-h,190px) + 14px)}
+.dayblock:first-child{margin-top:14px}
+
+/* Day headers stick under the toolbar as you scroll, so you always know which
+   day the cards under your thumb belong to. --topbar-h is measured live. */
+.dayhead{
+  position:sticky;top:calc(var(--topbar-h,190px) + 2px);z-index:20;
+  display:flex;align-items:center;gap:11px;margin-bottom:11px;
+  padding:8px 13px 8px 11px;border-radius:14px;
+  background:rgba(23,13,45,.9);
+  backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);
+  border:1px solid var(--stroke);
+  box-shadow:0 6px 20px -12px rgba(0,0,0,.9);
+}
+.dayhead .dnum{
+  font-size:23px;font-weight:850;letter-spacing:-.05em;line-height:1;flex:0 0 auto;
+  background:linear-gradient(150deg,#fff,var(--ink-dim));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.dayhead .dtxt{display:flex;flex-direction:column;gap:2px;min-width:0;line-height:1}
+.dayhead .dtxt b{font-size:13px;font-weight:800;letter-spacing:-.015em}
+.dayhead .dtxt i{font-size:9.5px;font-style:normal;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--ink-faint)}
+.dayhead .meta{
+  font-size:10.5px;color:var(--ink-dim);font-weight:800;margin-left:auto;flex:0 0 auto;
+  letter-spacing:.04em;padding:4px 9px;border-radius:8px;background:rgba(255,255,255,.07);
+}
+.dayhead .tag{font-size:9.5px;font-weight:850;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:7px;background:var(--lime);color:#0b0618;flex:0 0 auto}
+
+/* Today reads instantly without hunting for the label. */
+.dayhead.is-today{
+  background:linear-gradient(100deg,rgba(163,230,53,.20),rgba(23,13,45,.9) 62%);
+  border-color:rgba(163,230,53,.42);
+}
+.dayhead.is-today .dnum{background:none;-webkit-text-fill-color:var(--lime);color:var(--lime)}
+.dayhead.is-today .dtxt i{color:rgba(163,230,53,.8)}
+/* Days already gone are dimmed so the week reads front-to-back at a glance. */
+.dayhead.is-past{opacity:.6}
+.dayhead.is-past .dnum{background:none;-webkit-text-fill-color:var(--ink-faint);color:var(--ink-faint)}
 
 .ep{
   display:flex;gap:12px;align-items:center;padding:10px;margin-bottom:9px;
@@ -207,6 +241,12 @@ img{display:block}
 .ep .title{font-size:12.5px;color:var(--ink-dim);margin-top:2px;font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ep .right{text-align:right;flex:0 0 auto;position:relative}
 .ep .time{font-size:12.5px;font-weight:800;color:var(--ink-dim);white-space:nowrap}
+/* The network's own air date, when it differs from the local one. Purely a
+   cross-reference aid — the card itself sits on the day you can watch it. */
+.listed{
+  font-size:9.5px;font-weight:750;letter-spacing:.01em;color:var(--ink-faint);
+  margin-left:7px;text-transform:none;
+}
 .ep .state{font-size:9.5px;font-weight:850;letter-spacing:.06em;text-transform:uppercase;margin-top:5px;padding:3px 7px;border-radius:6px;display:inline-block;white-space:nowrap}
 .state.out{background:rgba(163,230,53,.18);color:var(--lime)}
 .state.soon{background:rgba(251,191,36,.18);color:var(--gold)}
@@ -533,6 +573,7 @@ const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const DAY = 86400000;
 const DOW = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const DOWFULL = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
@@ -563,6 +604,10 @@ function weekStart(d){
 }
 /** Local YYYY-MM-DD key — never use toISOString(), it shifts by timezone. */
 const key = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+/** Turn a "YYYY-MM-DD" key back into a local midnight Date. */
+const dayFromKey = k => { const [y,m,d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
+/** Accepts either a date key or a full ISO stamp (older stored announcements). */
+const parseDay = v => /^\d{4}-\d{2}-\d{2}$/.test(v || "") ? dayFromKey(v) : new Date(v);
 /** Whole calendar days from today to d (negative = past). */
 const daysAway = d => Math.round((midnight(d) - midnight(new Date())) / DAY);
 
@@ -627,7 +672,7 @@ async function searchShows(q){
 
 /** Episodes for a show, normalised and sorted. Specials are excluded. */
 async function getEpisodes(showId, force = false){
-  const k = "st:ep:" + showId;
+  const k = "st:ep2:" + showId;   // v2 shape adds netDate — old cache must miss
   if (!force){
     const c = cacheGet(k, EP_TTL);
     if (c) return c;
@@ -641,12 +686,19 @@ async function getEpisodes(showId, force = false){
       // TVmaze uses the literal string "TBA" for unannounced titles —
       // better to show nothing than to show "TBA".
       name:   /^tba$/i.test(e.name || "") ? "" : (e.name || ""),
-      // airstamp carries the network's timezone; converting it to the
-      // viewer's local clock is what actually answers "when can I watch".
-      at:     e.airstamp || `${e.airdate}T${e.airtime || "20:00"}:00`,
-      type:   e.type || "regular"
+      // The exact moment it airs, in the network's timezone. Used for the
+      // clock time we display and for "has it aired yet".
+      at:      e.airstamp || `${e.airdate}T${e.airtime || "20:00"}:00`,
+      // The date the NETWORK calls it. Episodes are filed under this so the
+      // calendar agrees with TVmaze/IMDb. A US show airing 23:30 ET on the
+      // 23rd is "the 23rd episode" even though it reaches the UK at 04:30
+      // on the 24th — that shift is surfaced with a +1d marker instead.
+      netDate: e.airdate || key(new Date(e.airstamp)),
+      type:    e.type || "regular"
     }))
-    .sort((a, b) => new Date(a.at) - new Date(b.at));
+    .sort((a, b) => a.netDate < b.netDate ? -1
+                  : a.netDate > b.netDate ?  1
+                  : new Date(a.at) - new Date(b.at));
   cacheSet(k, eps);
   return eps;
 }
@@ -744,16 +796,29 @@ function detectNewSeason(show, eps){
 
 /* ═══════════════════  RENDER: WEEK  ═══════════════════ */
 function weekEpisodes(){
+  // Episodes are filed under the day they become available TO YOU — the
+  // network's air time converted to local. A US show airing 23:30 Sunday ET
+  // is a Monday-morning episode here, and that is the honest answer to
+  // "when can I actually watch this".
   const from = anchor.getTime();
   const to   = from + 7 * DAY;
   const out  = [];
   for (const s of shows){
     for (const e of epsById.get(s.id) || []){
       const d = new Date(e.at);
-      if (d >= from && d < to) out.push({ ...e, show: s, date: d });
+      if (d >= from && d < to)
+        out.push({ ...e, show: s, date: d, day: midnight(d) });
     }
   }
   return out.sort((a, b) => a.date - b.date);
+}
+
+/** The network's own air date, when it differs from the local one — shown so
+    a listing on TVmaze/IMDb can be matched up without doing the maths. */
+function listedAs(ep){
+  if (!ep.netDate || key(ep.date) === ep.netDate) return "";
+  const d = dayFromKey(ep.netDate);
+  return `listed ${DOW[(d.getDay()+6)%7]} ${d.getDate()}`;
 }
 
 function stateOf(ep){
@@ -805,10 +870,10 @@ function render(){
     : `${anchor.getDate()} ${MON[anchor.getMonth()]} – ${end.getDate()} ${MON[end.getMonth()]}`;
   const off = Math.round((anchor - weekStart(new Date())) / (7 * DAY));
   $("#wSub").textContent =
-    off === 0 ? `This week · ${eps.length} episode${eps.length === 1 ? "" : "s"}`
-    : off === 1 ? `Next week · ${eps.length} episode${eps.length === 1 ? "" : "s"}`
-    : off === -1 ? `Last week · ${eps.length} episode${eps.length === 1 ? "" : "s"}`
-    : `${off > 0 ? "In" : ""} ${Math.abs(off)} weeks ${off > 0 ? "" : "ago"} · ${eps.length} episode${eps.length === 1 ? "" : "s"}`;
+    off === 0 ? `This week · ${eps.length} ep${eps.length === 1 ? "" : "s"}`
+    : off === 1 ? `Next week · ${eps.length} ep${eps.length === 1 ? "" : "s"}`
+    : off === -1 ? `Last week · ${eps.length} ep${eps.length === 1 ? "" : "s"}`
+    : `${off > 0 ? "In" : ""} ${Math.abs(off)} wks ${off > 0 ? "" : "ago"} · ${eps.length} ep${eps.length === 1 ? "" : "s"}`;
   $("#nowBtn").classList.toggle("hidden", off === 0);
   $("#wSub").textContent = $("#wSub").textContent.replace(/\s+/g, " ").trim();
 
@@ -827,12 +892,14 @@ function render(){
   } else {
     const todayK = key(new Date());
     board.innerHTML = [...byDay.entries()].map(([k, list]) => {
-      const d = list[0].date;
+      const d = list[0].day;
+      const cls = k === todayK ? "is-today" : (k < todayK ? "is-past" : "");
       return `<section class="dayblock" id="d-${k}">
-        <div class="dayhead">
-          <h3>${fmtDate(d)}</h3>
+        <div class="dayhead ${cls}">
+          <span class="dnum">${d.getDate()}</span>
+          <span class="dtxt"><b>${DOWFULL[(d.getDay()+6)%7]}</b><i>${MON[d.getMonth()]}</i></span>
           ${k === todayK ? '<span class="tag">Today</span>' : ""}
-          <span class="meta">${list.length} ep${list.length === 1 ? "" : "s"}</span>
+          <span class="meta">${list.length} EP${list.length === 1 ? "" : "S"}</span>
         </div>
         ${list.map(epCard).join("")}
       </section>`;
@@ -845,7 +912,8 @@ function render(){
 }
 
 function epCard(e){
-  const st  = stateOf(e);
+  const st     = stateOf(e);
+  const listed = listedAs(e);
   const img = e.show.image
     ? `<img class="poster" src="${esc(e.show.image)}" alt="" loading="lazy">`
     : `<div class="poster"></div>`;
@@ -853,7 +921,8 @@ function epCard(e){
     ${img}
     <div class="txt">
       <div class="show">${esc(e.show.name)}</div>
-      <div class="code">S${String(e.season).padStart(2,"0")}E${String(e.number).padStart(2,"0")}</div>
+      <div class="code">S${String(e.season).padStart(2,"0")}E${String(e.number).padStart(2,"0")}${
+        listed ? `<span class="listed" title="the date TVmaze and IMDb file this under, in the network's own timezone">${esc(listed)}</span>` : ""}</div>
       ${e.name ? `<div class="title">${esc(e.name)}</div>` : ""}
     </div>
     <div class="right">
@@ -869,7 +938,8 @@ function nextEpisode(showId){
   return (epsById.get(showId) || []).find(e => new Date(e.at).getTime() + 30 * 60000 > now) || null;
 }
 
-/** "how many days / weeks until" — days up to a fortnight, then weeks. */
+/** "how many days / weeks until" — days up to a fortnight, then weeks.
+    Counts to the moment it becomes available locally, matching the calendar. */
 function countdown(date){
   const d = daysAway(date);
   const mins = (date - Date.now()) / 60000;
@@ -976,6 +1046,18 @@ if (vv){
 }
 addEventListener("orientationchange", () => setTimeout(syncViewport, 260));
 syncViewport();
+
+/* The sticky day headers park directly beneath the toolbar, whose height
+   varies with safe-area insets and text size — so measure it rather than
+   hard-coding an offset that would drift on different iPhones. */
+function syncTopbar(){
+  const bar = $(".topbar");
+  if (!bar) return;
+  document.documentElement.style.setProperty("--topbar-h", Math.round(bar.getBoundingClientRect().height) + "px");
+}
+if (window.ResizeObserver) new ResizeObserver(syncTopbar).observe($(".topbar"));
+addEventListener("resize", syncTopbar);
+syncTopbar();
 
 let searchT, searchSeq = 0;
 $("#q").addEventListener("input", e => {
@@ -1217,7 +1299,7 @@ function drainParty(){
   $("#pSeason").textContent = `Season ${ann.season}`;
   $("#pName").textContent   = show.name;
   $("#pWhen").textContent   = ann.firstAir
-    ? `First episode ${fmtDate(new Date(ann.firstAir))} · ${countdownWords(new Date(ann.firstAir))}`
+    ? `First episode ${fmtDate(parseDay(ann.firstAir))} · ${countdownWords(parseDay(ann.firstAir))}`
     : "Air date not announced yet";
   $("#party").classList.add("on");
   burst();
